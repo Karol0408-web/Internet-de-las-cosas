@@ -1,11 +1,8 @@
 const WS_URL = "ws://localhost:8000/ws/telemetria";
 
-/* ====== CONFIGURACIÓN DEL TANQUE ======
-   Ajusta estos valores a tu tanque real:
-   - DISTANCIA_VACIO: lectura del sensor (cm) cuando el tanque está vacío
-   - DISTANCIA_LLENO: lectura del sensor (cm) cuando el tanque está lleno */
+/* ====== CONFIGURACIÓN DEL TANQUE ======*/
 const DISTANCIA_VACIO = 50;
-const DISTANCIA_LLENO = 2;
+const DISTANCIA_LLENO = 3;
 
 /* ====== REFERENCIAS DOM ====== */
 const distanceElement   = document.getElementById("distance");
