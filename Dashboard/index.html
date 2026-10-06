@@ -8,82 +8,120 @@
 </head>
 
 <body>
-  <main class="container">
+  <div class="app">
 
-    <header class="header">
-      <div>
-        <p class="eyebrow">INTERNET DE LAS COSAS</p>
-        <h1>Monitoreo de Tanque</h1>
-        <p class="subtitle">Telemetría en tiempo real mediante WebSocket</p>
-      </div>
-
-      <div id="connectionBadge" class="badge offline">
-        ● Desconectado
-      </div>
-    </header>
-
-    <section class="grid">
-
-      <article class="card main-card">
-        <span class="label">DISTANCIA DETECTADA</span>
-
-        <div class="metric">
-          <span id="distance">--</span>
-          <span class="unit">cm</span>
-        </div>
-
-        <p id="lastUpdate">Esperando datos...</p>
-      </article>
-
-      <article class="card">
-        <span class="label">NODO</span>
-        <h2 id="nodeId">--</h2>
-        <p>ESP32</p>
-      </article>
-
-      <article class="card">
-        <span class="label">SECUENCIA</span>
-        <h2 id="sequence">--</h2>
-        <p>Paquete recibido</p>
-      </article>
-
-      <article class="card">
-        <span class="label">ESTADO DEL SENSOR</span>
-        <h2 id="sensorStatus">Esperando</h2>
-        <p id="sensorDetail">Sin lecturas todavía</p>
-      </article>
-
-    </section>
-
-    <section class="card">
-      <div class="section-header">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-dot"></div>
         <div>
-          <span class="label">TELEMETRÍA</span>
-          <h2>Últimas lecturas</h2>
+          <strong>KASAMI</strong>
+          <span>IoT Platform</span>
         </div>
-        <button id="clearBtn">Limpiar</button>
       </div>
 
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>Hora</th>
-              <th>Distancia</th>
-              <th>Secuencia</th>
-            </tr>
-          </thead>
-          <tbody id="telemetryBody">
-          </tbody>
-        </table>
+      <nav class="nav">
+        <a class="nav-item active" href="#">▣ Dashboard</a>
+        <a class="nav-item" href="#">◈ Tanques</a>
+        <a class="nav-item" href="#">◇ Sensores</a>
+        <a class="nav-item" href="#">⚙ Ajustes</a>
+      </nav>
+
+      <div class="sidebar-foot">
+        <span class="label">VERSIÓN</span>
+        <strong>v1.0.4</strong>
       </div>
-    </section>
+    </aside>
 
-    <footer>
-      ESP32 → MQTT → FastAPI → WebSocket → Dashboard
-    </footer>
+    <!-- MAIN -->
+    <main class="main">
 
-  </main>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Captación de lluvia · Tanque principal</p>
+          <h1>Monitoreo de nivel</h1>
+        </div>
+
+        <div id="connectionBadge" class="badge offline">
+          ● Desconectado
+        </div>
+      </header>
+
+      <section class="hero">
+
+        <!-- TANQUE VISUAL -->
+        <div class="tank-card">
+          <div class="tank">
+            <div class="tank-fill" id="tankFill"></div>
+            <div class="tank-marks">
+              <span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span>
+            </div>
+          </div>
+          <div class="tank-meta">
+            <span class="label">NIVEL ESTIMADO</span>
+            <strong id="tankLevel">-- %</strong>
+          </div>
+        </div>
+
+        <!-- MÉTRICA GRANDE -->
+        <div class="metric-card">
+          <span class="label">DISTANCIA AL SENSOR</span>
+          <div class="metric">
+            <span id="distance">--</span>
+            <span class="unit">cm</span>
+          </div>
+          <p id="lastUpdate">Esperando datos...</p>
+        </div>
+
+        <!-- TARJETAS PEQUEÑAS -->
+        <div class="mini-grid">
+          <div class="mini-card accent-blue">
+            <span class="label">NODO</span>
+            <strong id="nodeId">--</strong>
+            <small>ESP32</small>
+          </div>
+          <div class="mini-card accent-green">
+            <span class="label">SECUENCIA</span>
+            <strong id="sequence">--</strong>
+            <small>Paquete</small>
+          </div>
+          <div class="mini-card accent-amber">
+            <span class="label">SENSOR</span>
+            <strong id="sensorStatus">Esperando</strong>
+            <small id="sensorDetail">Sin lecturas</small>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- TABLA -->
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <span class="label">TELEMETRÍA</span>
+            <h2>Últimas lecturas</h2>
+          </div>
+          <button id="clearBtn">Limpiar</button>
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Hora</th>
+                <th>Distancia</th>
+                <th>Secuencia</th>
+              </tr>
+            </thead>
+            <tbody id="telemetryBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer>ESP32 → MQTT → FastAPI → WebSocket → Dashboard</footer>
+
+    </main>
+  </div>
 
   <script src="app.js"></script>
 </body>
