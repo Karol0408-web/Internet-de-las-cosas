@@ -1,8 +1,8 @@
 
 const WS_URL = "ws://localhost:8000/ws/telemetria";
 
-const DISTANCIA_VACIO = 25;
-const DISTANCIA_LLENO = 2;
+const DISTANCIA_VACIO = 15;
+const DISTANCIA_LLENO = 1;
 
 const $ = (id) => document.getElementById(id);
 

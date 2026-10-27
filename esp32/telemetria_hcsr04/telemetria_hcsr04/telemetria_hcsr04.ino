@@ -11,9 +11,9 @@ const int ECHO_PIN = 18;
 const int TURBIDITY_PIN = 34;
 
 // ---------- Configuracion ----------
-const char* WIFI_SSID = "Megacable_2.4G_FD80";
-const char* WIFI_PASSWORD = "xbkpGdEX";
-const char* MQTT_BROKER = "192.168.1.11";
+const char* WIFI_SSID = "Mike Odiseo";
+const char* WIFI_PASSWORD = "123456789";
+const char* MQTT_BROKER = "192.168.137.78";
 const int MQTT_PORT = 1883;
 const char* MQTT_TOPIC = "iot/tanque/telemetria";
 

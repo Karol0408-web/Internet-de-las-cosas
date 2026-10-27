@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Prueba WS</title>
+  <style>
+    table { border-collapse: collapse; margin: 12px 0; }
+    th, td { border: 1px solid #888; padding: 6px 12px; text-align: center; }
+    td:first-child { text-align: left; }
+  </style>
+</head>
+<body>
+  <h3 id="estado">Desconectado</h3>
+  <p>Nodo: <b id="nodo">--</b> | Distancia: <b id="dist">--</b> cm |
+     Turbidez: <b id="turb">--</b> V | Heap libre: <b id="heap">--</b></p>
+
+  <h4>Estadísticas del ESP32 (Experimento 1)</h4>
+  <table>
+    <thead>
+      <tr><th>Configuración</th><th>Tiempo medio (ms)</th><th>Máximo (ms)</th>
+          <th>Correctos</th><th>Fallos</th><th>Mensajes WebSocket</th></tr>
+    </thead>
+    <tbody>
+      <tr id="fila0"><td>QoS 0</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td></tr>
+      <tr id="fila1"><td>QoS 1</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Registro de resultados del experimento 2</h4>
+  <table>
+    <tr><td>URL utilizada</td><td id="r_url">--</td></tr>
+    <tr><td>Hora de inicio</td><td id="r_inicio">--</td></tr>
+    <tr><td>Duración de la captura</td><td id="r_dur">--</td></tr>
+    <tr><td>Mensajes recibidos por el navegador</td><td id="r_msgs">0</td></tr>
+    <tr><td>Estado final del WebSocket</td><td id="r_estado">--</td></tr>
+    <tr><td>¿Se observó reconexión automática?</td><td id="r_reco">No</td></tr>
+  </table>
+  <button onclick="reiniciar()">Reiniciar captura</button>
+  <button onclick="finalizar()">Finalizar captura</button>
+
+  <pre id="log"></pre>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const URL_WS = "ws://localhost:8000/ws/telemetria";
+    const ESTADOS = ["CONNECTING", "OPEN", "CLOSING", "CLOSED"];
+
+    let ws = null, n = 0, porQos = { 0: 0, 1: 0 };
+    let inicio = null, fin = null, reconexiones = 0, hubeCierre = false;
+    let detenido = false, ultimoCierre = null;
+
+    $("r_url").textContent = URL_WS;
+
+    function pintar() {
+      $("r_msgs").textContent = n;
+      if (inicio) {
+        const fFin = fin || new Date();
+        const seg = Math.round((fFin - inicio) / 1000);
+        $("r_dur").textContent = `${Math.floor(seg / 60)} min ${seg % 60} s`;
+      }
+      if (!fin) {
+        $("r_estado").textContent = ws ? ESTADOS[ws.readyState] : "--";
+      }
+      $("r_reco").textContent = reconexiones > 0
+        ? `Sí (${reconexiones} ${reconexiones === 1 ? "vez" : "veces"})` : "No";
+    }
+    setInterval(pintar, 500);
+
+    function reiniciar() {
+      n = 0; porQos = { 0: 0, 1: 0 };
+      inicio = new Date(); fin = null; reconexiones = 0;
+      $("r_inicio").textContent = inicio.toLocaleTimeString();
+      pintar();
+    }
+
+    function finalizar() {
+      fin = new Date();
+      const estado = ws ? ESTADOS[ws.readyState] : "--";
+      const cod = ultimoCierre ? `, último cierre código ${ultimoCierre}` : "";
+      $("r_estado").textContent = estado + cod;
+      detenido = true;
+      if (ws) ws.close();
+      pintar();
+    }
+
+    function conectar() {
+      ws = new WebSocket(URL_WS);
+
+      ws.onopen = () => {
+        $("estado").textContent = "Conectado";
+        if (!inicio) {
+          inicio = new Date();
+          $("r_inicio").textContent = inicio.toLocaleTimeString();
+        }
+        if (hubeCierre) reconexiones++;
+      };
+
+      ws.onclose = e => {
+        ultimoCierre = e.code;
+        hubeCierre = true;
+        $("estado").textContent = "Desconectado, reintentando...";
+        if (!detenido) setTimeout(conectar, 2000);
+      };
+
+      ws.onmessage = e => {
+        const d = JSON.parse(e.data);
+        $("nodo").textContent = d.node_id ?? "--";
+        $("dist").textContent = d.data?.distancia_cm ?? "--";
+        $("turb").textContent = d.data?.turbidez_v ?? "--";
+        $("heap").textContent = d.heap_free ?? "--";
+        n++;
+
+        const s = d.stats;
+        if (s) {
+          porQos[s.qos]++;
+          const c = $("fila" + s.qos).children;
+          c[1].textContent = s.avg_ms;
+          c[2].textContent = s.max_ms;
+          c[3].textContent = s.ok;
+          c[4].textContent = s.fail;
+          c[5].textContent = porQos[s.qos];
+        }
+        $("log").textContent = e.data + "\n" + $("log").textContent.slice(0, 1500);
+      };
+    }
+    conectar();
+  </script>
+</body>
+</html>
