@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KASAMI - Nivel del tanque</title>
+  <title>IoT - Nivel del tanque</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Instrument+Sans:wght@400;600&display=swap" rel="stylesheet">
@@ -11,36 +11,29 @@
 </head>
 
 <body>
-  <aside class="gauge-col">
-    <div class="brand">Kasami</div>
-
-    <div class="gauge">
-      <div class="tank">
-        <div class="tank-fill" id="tankFill"></div>
-      </div>
-      <ol class="ticks">
-        <li>100%</li><li>75%</li><li>50%</li><li>25%</li><li>0%</li>
-      </ol>
+  <header class="head">
+    <div>
+      <p class="eyebrow">MONITOREO EN TIEMPO REAL</p>
+      <h1>Estado del agua</h1>
+      <p>Captación pluvial · Tanque principal</p>
     </div>
-
-    <div class="level">
-      <strong id="tankLevel">-- %</strong>
-      <span>del tanque lleno</span>
-    </div>
-  </aside>
+    <div id="connectionBadge" class="badge offline">● Desconectado</div>
+  </header>
 
   <main class="content">
-    <header class="head">
-      <p>Captación de lluvia, tanque principal</p>
-      <div id="connectionBadge" class="badge offline">● Desconectado</div>
-    </header>
-
     <section class="reading">
       <p class="caption">Distancia del sensor al agua</p>
       <div class="distance">
         <span id="distance">--</span><span class="unit">cm</span>
       </div>
       <p class="stamp" id="lastUpdate">Esperando datos...</p>
+    </section>
+
+    <section class="tank-card">
+      <div class="tank">
+        <div id="tankFill" class="tank-fill"></div>
+      </div>
+      <strong id="tankLevel">-- %</strong>
     </section>
 
     <dl class="facts">
@@ -59,7 +52,56 @@
         <dd id="sensorStatus">Esperando</dd>
         <dd class="note" id="sensorDetail">Sin lecturas</dd>
       </div>
+      <div>
+        <dt>Turbidez</dt>
+        <dd id="turbidityStatus">--</dd>
+        <dd class="note" id="turbidityDetail">Sin lecturas</dd>
+      </div>
     </dl>
+
+    <section class="quality">
+      <div class="section-heading">
+        <div>
+          <h2>Calidad del agua</h2>
+          <p>Clasificación según la lectura del sensor de turbidez</p>
+        </div>
+      </div>
+
+      <div class="quality-current">
+        <span class="current-label">Diagnóstico actual</span>
+        <strong id="qualityCurrent">Esperando lectura</strong>
+        <p id="qualityDetail" class="quality-foot">Sin lecturas disponibles</p>
+      </div>
+
+      <div class="turbidity-scale" id="turbidityScale">
+        <div class="turbidity-segment segment-clear" data-diagnosis="AGUA_CLARA">
+          <span class="segment-bar"></span>
+          <span class="segment-name">Agua clara</span>
+          <span class="segment-range">Nivel 1</span>
+        </div>
+        <div class="turbidity-segment segment-low" data-diagnosis="AGUA_POCO_TURBIA">
+          <span class="segment-bar"></span>
+          <span class="segment-name">Poco turbia</span>
+          <span class="segment-range">Nivel 2</span>
+        </div>
+        <div class="turbidity-segment segment-medium" data-diagnosis="AGUA_MEDIA_TURBIA">
+          <span class="segment-bar"></span>
+          <span class="segment-name">Turbidez media</span>
+          <span class="segment-range">Nivel 3</span>
+        </div>
+        <div class="turbidity-segment segment-high" data-diagnosis="AGUA_TURBIA">
+          <span class="segment-bar"></span>
+          <span class="segment-name">Agua turbia</span>
+          <span class="segment-range">Nivel 4</span>
+        </div>
+      </div>
+
+      <p class="quality-foot">
+        La clasificación es orientativa y depende de la calibración
+        del sensor. La turbidez no determina por sí sola si el agua
+        es potable.
+      </p>
+    </section>
 
     <section class="log">
       <div class="log-head">
@@ -69,7 +111,7 @@
       <div class="table-wrapper">
         <table>
           <thead>
-            <tr><th>Hora</th><th>Distancia</th><th>Secuencia</th></tr>
+            <tr><th>Hora</th><th>Distancia</th><th>Turbidez</th><th>Secuencia</th></tr>
           </thead>
           <tbody id="telemetryBody"></tbody>
         </table>

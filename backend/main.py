@@ -1,3 +1,4 @@
+
 import asyncio
 import json
 from contextlib import asynccontextmanager
@@ -11,7 +12,10 @@ MQTT_PORT = 1883
 MQTT_TOPIC = "iot/tanque/telemetria"
 
 clients: set[WebSocket] = set()
-mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+mqtt_connected = False
+mqtt_client = mqtt.Client(
+    callback_api_version=mqtt.CallbackAPIVersion.VERSION2
+)
 main_loop: asyncio.AbstractEventLoop | None = None
 
 
@@ -30,21 +34,41 @@ async def broadcast(payload: dict):
 
 
 def on_connect(client, userdata, flags, reason_code, properties):
-    print(f"[MQTT] Conectado. reason_code={reason_code}")
-    client.subscribe(MQTT_TOPIC)
-    print(f"[MQTT] Suscrito a {MQTT_TOPIC}")
+    global mqtt_connected
+
+    mqtt_connected = (reason_code == 0)
+
+    print(f"[MQTT] Conectado: {mqtt_connected}, codigo={reason_code}")
+
+    if mqtt_connected:
+        client.subscribe(MQTT_TOPIC)
+        print(f"[MQTT] Suscrito a {MQTT_TOPIC}")
+
+
+def on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
+    global mqtt_connected
+    mqtt_connected = False
+    print(f"[MQTT] Desconectado: {reason_code}")
 
 
 def on_message(client, userdata, msg):
     try:
         payload = json.loads(msg.payload.decode("utf-8"))
-        print("[MQTT]", payload)
 
-        if main_loop:
+        if not isinstance(payload, dict):
+            print("[MQTT] Mensaje ignorado: se esperaba un objeto JSON")
+            return
+
+        print("[MQTT] Telemetria recibida:", payload)
+
+        if main_loop and main_loop.is_running():
             asyncio.run_coroutine_threadsafe(
                 broadcast(payload),
                 main_loop
             )
+
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        print("[MQTT] JSON invalido:", exc)
     except Exception as exc:
         print("[MQTT] Error:", exc)
 
@@ -55,6 +79,7 @@ async def lifespan(app: FastAPI):
     main_loop = asyncio.get_running_loop()
 
     mqtt_client.on_connect = on_connect
+    mqtt_client.on_disconnect = on_disconnect
     mqtt_client.on_message = on_message
 
     try:
@@ -70,7 +95,10 @@ async def lifespan(app: FastAPI):
     mqtt_client.disconnect()
 
 
-app = FastAPI(title="Dashboard IoT - Tanque", lifespan=lifespan)
+app = FastAPI(
+    title="Dashboard IoT - Tanque",
+    lifespan=lifespan
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -86,6 +114,7 @@ async def root():
     return {
         "project": "Monitoreo de Nivel de Agua y Turbidez",
         "status": "running",
+        "mqtt_connected": mqtt_connected,
         "websocket": "/ws/telemetria",
         "mqtt_topic": MQTT_TOPIC,
     }
@@ -93,7 +122,11 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "mqtt_topic": MQTT_TOPIC}
+    return {
+        "status": "ok",
+        "mqtt_connected": mqtt_connected,
+        "mqtt_topic": MQTT_TOPIC,
+    }
 
 
 @app.websocket("/ws/telemetria")
@@ -110,6 +143,7 @@ async def websocket_telemetria(websocket: WebSocket):
 
         while True:
             await websocket.receive_text()
+
     except WebSocketDisconnect:
         pass
     except Exception as exc:

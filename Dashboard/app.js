@@ -1,163 +1,268 @@
+
 const WS_URL = "ws://localhost:8000/ws/telemetria";
 
-/* ====== CONFIGURACIÓN DEL TANQUE ======*/
-const DISTANCIA_VACIO = 50;
-const DISTANCIA_LLENO = 3;
+const DISTANCIA_VACIO = 25;
+const DISTANCIA_LLENO = 2;
 
-/* ====== REFERENCIAS DOM ====== */
-const distanceElement   = document.getElementById("distance");
-const nodeElement       = document.getElementById("nodeId");
-const sequenceElement   = document.getElementById("sequence");
-const statusElement     = document.getElementById("sensorStatus");
-const detailElement     = document.getElementById("sensorDetail");
-const lastUpdateElement = document.getElementById("lastUpdate");
-const badgeElement      = document.getElementById("connectionBadge");
-const tableBody         = document.getElementById("telemetryBody");
-const clearBtn          = document.getElementById("clearBtn");
-const tankFill          = document.getElementById("tankFill");
-const tankLevel         = document.getElementById("tankLevel");
+const $ = (id) => document.getElementById(id);
+
+const distanceElement = $("distance");
+const nodeElement = $("nodeId");
+const sequenceElement = $("sequence");
+const statusElement = $("sensorStatus");
+const detailElement = $("sensorDetail");
+const lastUpdateElement = $("lastUpdate");
+const badgeElement = $("connectionBadge");
+const tableBody = $("telemetryBody");
+const clearBtn = $("clearBtn");
+const tankFill = $("tankFill");
+const tankLevel = $("tankLevel");
+const turbidityStatusElement = $("turbidityStatus");
+const turbidityDetailElement = $("turbidityDetail");
+const qualityCurrent = $("qualityCurrent");
+const qualityDetail = $("qualityDetail");
 
 let socket = null;
+let reconnectTimer = null;
 
-/* ====== UTILIDADES ====== */
-function setConnection(connected) {
-  badgeElement.classList.toggle("online", connected);
-  badgeElement.classList.toggle("offline", !connected);
-  badgeElement.textContent = connected ? "● Conectado" : "● Desconectado";
-}
+const DIAGNOSTICOS = {
+  AGUA_CLARA: {
+    texto: "Agua clara",
+    color: "#27866d"
+  },
+  AGUA_POCO_TURBIA: {
+    texto: "Poco turbia",
+    color: "#82983d"
+  },
+  AGUA_MEDIA_TURBIA: {
+    texto: "Turbidez media",
+    color: "#c58a2d"
+  },
+  AGUA_TURBIA: {
+    texto: "Agua turbia",
+    color: "#c75449"
+  },
+  SIN_CALIBRAR: {
+    texto: "Sin calibrar",
+    color: "#c58a2d"
+  },
+  RECALIBRAR: {
+    texto: "Recalibrar sensor",
+    color: "#c58a2d"
+  },
+  FUERA_DE_RANGO: {
+    texto: "Fuera de rango",
+    color: "#c75449"
+  }
+};
 
 function fmt(n, digits = 1) {
   return Number(n).toFixed(digits);
 }
 
-function pad(n) {
-  return String(n).padStart(2, "0");
-}
-
 function timeString(d = new Date()) {
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return [d.getHours(), d.getMinutes(), d.getSeconds()]
+    .map(n => String(n).padStart(2, "0"))
+    .join(":");
 }
 
-/* ====== TANQUE ====== */
+function setConnection(connected) {
+  badgeElement.classList.toggle("online", connected);
+  badgeElement.classList.toggle("offline", !connected);
+  badgeElement.textContent = connected
+    ? "● Conectado"
+    : "● Desconectado";
+}
+
 function actualizarTanque(distanciaCm) {
   const rango = DISTANCIA_VACIO - DISTANCIA_LLENO;
-  if (rango <= 0) return;
+  if (!Number.isFinite(distanciaCm) || rango <= 0) return;
 
-  let nivel = ((DISTANCIA_VACIO - distanciaCm) / rango) * 100;
+  let nivel =
+    ((DISTANCIA_VACIO - distanciaCm) / rango) * 100;
+
   nivel = Math.max(0, Math.min(100, nivel));
 
-  // Altura de la columna de agua
   tankFill.style.height = nivel + "%";
 
-  // Color dinámico según nivel
-  let color, glow;
+  // Paleta discreta según el nivel del tanque.
   if (nivel < 20) {
-    color = "linear-gradient(180deg, #f43f5e, #9f1239)";
-    glow  = "0 -8px 24px rgba(244, 63, 94, 0.6)";
+    tankFill.style.background =
+      "linear-gradient(180deg, #e5a59b, #c75449)";
   } else if (nivel < 50) {
-    color = "linear-gradient(180deg, #fbbf24, #b45309)";
-    glow  = "0 -8px 24px rgba(251, 191, 36, 0.55)";
+    tankFill.style.background =
+      "linear-gradient(180deg, #e8c878, #c58a2d)";
   } else {
-    color = "linear-gradient(180deg, #4cc9f0, #1d7fa8)";
-    glow  = "0 -8px 24px rgba(76, 201, 240, 0.6)";
+    tankFill.style.background =
+      "linear-gradient(180deg, #8dd9e2, #238ca3 55%, #176476)";
   }
 
-  tankFill.style.background = color;
-  tankFill.style.boxShadow = glow;
-
-  // Etiqueta de porcentaje
-  tankLevel.textContent = fmt(nivel, 1) + " %";
+  tankLevel.textContent = fmt(nivel) + " %";
   tankLevel.style.color =
-    nivel < 20 ? "#f43f5e" :
-    nivel < 50 ? "#fbbf24" :
-                 "#4cc9f0";
+    nivel < 20 ? "#c75449" :
+    nivel < 50 ? "#b17b25" :
+    "#238ca3";
 }
 
-/* ====== TABLA ====== */
+function actualizarTurbidez(data) {
+  const codigo = data.diagnostico_turbidez;
+  const diagnostico = DIAGNOSTICOS[codigo];
+
+  // Actualiza el indicador de los datos generales.
+  if (turbidityStatusElement) {
+    turbidityStatusElement.textContent =
+      diagnostico?.texto ?? "--";
+
+    turbidityStatusElement.style.color =
+      diagnostico?.color ?? "";
+  }
+
+  let detalle = "Sin lectura válida";
+
+  if (typeof data.turbidity_pct === "number") {
+    detalle = `${data.turbidity_pct} % turbia`;
+  }
+
+  if (typeof data.turbidity_voltage_mv === "number") {
+    detalle += ` · ${data.turbidity_voltage_mv} mV`;
+  }
+
+  if (turbidityDetailElement) {
+    turbidityDetailElement.textContent = detalle;
+  }
+
+  if (qualityDetail) {
+    qualityDetail.textContent = detalle;
+  }
+
+  if (qualityCurrent) {
+    qualityCurrent.textContent =
+      diagnostico?.texto ?? "Sin diagnóstico válido";
+
+    qualityCurrent.style.color =
+      diagnostico?.color ?? "";
+  }
+
+  // Resalta únicamente el segmento correspondiente
+  // al diagnóstico enviado por el ESP32.
+  document.querySelectorAll(".turbidity-segment")
+    .forEach(segment => {
+      const activo =
+        diagnostico &&
+        segment.dataset.diagnosis === codigo;
+
+      segment.classList.toggle("active", Boolean(activo));
+    });
+}
+
+function setSensorOK(ok, mensaje) {
+  statusElement.textContent = ok ? "Activo" : "Sin datos";
+
+  statusElement.style.color =
+    ok ? "#27866d" : "#c75449";
+
+  detailElement.textContent = mensaje ??
+    (ok
+      ? "Lectura recibida correctamente"
+      : "Esperando lecturas");
+}
+
 function addRow(data) {
   const row = document.createElement("tr");
-  row.innerHTML = `
-    <td>${timeString()}</td>
-    <td>${fmt(data.distance_cm)} cm</td>
-    <td>${data.sequence_id ?? "--"}</td>
-  `;
+
+  const values = [
+    timeString(),
+    typeof data.distance_cm === "number"
+      ? fmt(data.distance_cm) + " cm"
+      : "--",
+    DIAGNOSTICOS[data.diagnostico_turbidez]?.texto ?? "--",
+    data.sequence_id ?? "--"
+  ];
+
+  values.forEach(value => {
+    const cell = document.createElement("td");
+    cell.textContent = String(value);
+    row.appendChild(cell);
+  });
+
   tableBody.prepend(row);
 
   while (tableBody.children.length > 10) {
-    tableBody.removeChild(tableBody.lastChild);
+    tableBody.removeChild(tableBody.lastElementChild);
   }
 }
 
-/* ====== ESTADO DEL SENSOR ====== */
-function setSensorOK(ok, mensaje) {
-  if (ok) {
-    statusElement.textContent = "Activo";
-    statusElement.style.color = "#4ade80";
-    detailElement.textContent = mensaje ?? "Lectura recibida correctamente";
-  } else {
-    statusElement.textContent = "Sin datos";
-    statusElement.style.color = "#f43f5e";
-    detailElement.textContent = mensaje ?? "Sin lecturas todavía";
-  }
-}
-
-/* ====== PROCESAMIENTO DE DATOS ====== */
 function handleData(data) {
   if (data.type === "status") return;
 
-  if (typeof data.distance_cm !== "number") {
-    setSensorOK(false, "Paquete sin distancia válida");
-    return;
-  }
-
-  distanceElement.textContent = fmt(data.distance_cm);
-  nodeElement.textContent     = data.node_id ?? "--";
+  nodeElement.textContent = data.node_id ?? "--";
   sequenceElement.textContent = data.sequence_id ?? "--";
 
-  setSensorOK(true);
-  lastUpdateElement.textContent = "Última lectura: " + timeString();
+  lastUpdateElement.textContent =
+    "Última lectura: " + timeString();
 
-  actualizarTanque(data.distance_cm);
+  actualizarTurbidez(data);
+
+  if (typeof data.distance_cm === "number") {
+    distanceElement.textContent = fmt(data.distance_cm);
+    actualizarTanque(data.distance_cm);
+    setSensorOK(true);
+  } else {
+    distanceElement.textContent = "--";
+    setSensorOK(false, "Paquete sin distancia válida");
+  }
+
   addRow(data);
 }
 
-/* ====== WEBSOCKET ====== */
 function connect() {
+  // Evita conexiones duplicadas.
+  if (
+    socket &&
+    (socket.readyState === WebSocket.OPEN ||
+     socket.readyState === WebSocket.CONNECTING)
+  ) {
+    return;
+  }
+
   socket = new WebSocket(WS_URL);
 
   socket.onopen = () => {
     setConnection(true);
-    console.log("✅ WebSocket conectado");
+    console.log("WebSocket conectado");
   };
 
-  socket.onmessage = (event) => {
+  socket.onmessage = event => {
     try {
-      const data = JSON.parse(event.data);
-      handleData(data);
+      handleData(JSON.parse(event.data));
     } catch (error) {
-      console.error("JSON inválido:", error);
+      console.error("Error procesando el mensaje:", error);
     }
   };
 
   socket.onclose = () => {
     setConnection(false);
     setSensorOK(false, "Desconectado del servidor");
-    console.log(" WebSocket desconectado. Reintentando en 2s...");
-    setTimeout(connect, 2000);
+
+    if (reconnectTimer === null) {
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, 2000);
+    }
   };
 
-  socket.onerror = (error) => {
-    console.error("WebSocket error:", error);
-    try { socket.close(); } catch (_) {}
+  socket.onerror = error => {
+    console.error("Error de WebSocket:", error);
+    socket.close();
   };
 }
 
-/* ====== BOTÓN LIMPIAR ====== */
 clearBtn.addEventListener("click", () => {
-  tableBody.innerHTML = "";
+  tableBody.replaceChildren();
 });
 
-/* ====== INICIO ====== */
+setConnection(false);
 setSensorOK(false);
-actualizarTanque(DISTANCIA_VACIO); // arranca en 0%
+actualizarTanque(DISTANCIA_VACIO);
 connect();
