@@ -3,124 +3,273 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IoT - Nivel del tanque</title>
+  <title>Estación Hidrológica — Nivel del tanque</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Instrument+Sans:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Fraunces: titulares editoriales / IBM Plex Mono: datos / Archivo: interfaz -->
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=IBM+Plex+Mono:wght@400;500;600&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-  <header class="head">
-    <div>
-      <p class="eyebrow">MONITOREO EN TIEMPO REAL</p>
-      <h1>Estado del agua</h1>
-      <p>Captación pluvial · Tanque principal</p>
+  <!-- Grano de papel sutil -->
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="masthead">
+    <div class="masthead-meta">
+      <span class="index-tag">EXP. 001</span>
+      <span class="index-tag">MONITOREO EN TIEMPO REAL</span>
+      <span class="index-tag">CAPTACIÓN PLUVIAL</span>
     </div>
-    <div id="connectionBadge" class="badge offline">● Desconectado</div>
-  </header>
 
-  <main class="content">
-    <section class="reading">
-      <p class="caption">Distancia del sensor al agua</p>
-      <div class="distance">
-        <span id="distance">--</span><span class="unit">cm</span>
-      </div>
-      <p class="stamp" id="lastUpdate">Esperando datos...</p>
-    </section>
+    <div class="masthead-title">
+      <h1>Estado<br><em>del agua</em></h1>
 
-    <section class="tank-card">
-      <div class="tank">
-        <div id="tankFill" class="tank-fill"></div>
-      </div>
-      <strong id="tankLevel">-- %</strong>
-    </section>
-
-    <dl class="facts">
-      <div>
-        <dt>Nodo</dt>
-        <dd id="nodeId">--</dd>
-        <dd class="note">ESP32</dd>
-      </div>
-      <div>
-        <dt>Secuencia</dt>
-        <dd id="sequence">--</dd>
-        <dd class="note">Último paquete</dd>
-      </div>
-      <div>
-        <dt>Sensor</dt>
-        <dd id="sensorStatus">Esperando</dd>
-        <dd class="note" id="sensorDetail">Sin lecturas</dd>
-      </div>
-      <div>
-        <dt>Turbidez</dt>
-        <dd id="turbidityStatus">--</dd>
-        <dd class="note" id="turbidityDetail">Sin lecturas</dd>
-      </div>
-    </dl>
-
-    <section class="quality">
-      <div class="section-heading">
-        <div>
-          <h2>Calidad del agua</h2>
-          <p>Clasificación según la lectura del sensor de turbidez</p>
+      <div class="masthead-aside">
+        <p class="kicker">Tanque principal · ESP32 · MQTT</p>
+        <div id="connectionBadge" class="status offline" aria-live="polite">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span class="status-text">Desconectado</span>
         </div>
       </div>
+    </div>
+
+    <!-- Regla técnica horizontal -->
+    <div class="rule" aria-hidden="true">
+      <span></span><span></span><span></span><span></span>
+      <strong>REGISTRO HIDROLÓGICO</strong>
+      <span></span><span></span><span></span><span></span>
+    </div>
+  </header>
+
+  <main class="sheet">
+    <!-- 01 · Lectura principal -->
+    <section class="reading" aria-labelledby="reading-title">
+      <div class="section-index">
+        <span class="index-number">01</span>
+        <h2 id="reading-title">Distancia del sensor al agua</h2>
+      </div>
+
+      <div class="reading-grid">
+        <div class="distance-block">
+          <p class="caption">Distancia medida</p>
+          <div class="distance" aria-live="polite">
+            <span id="distance">--</span>
+            <span class="unit">cm</span>
+          </div>
+          <p class="stamp" id="lastUpdate">Esperando datos…</p>
+        </div>
+
+        <!-- Tanque tipo instrumento técnico -->
+        <div class="tank-block">
+          <div class="tank" role="img" aria-label="Nivel actual del tanque">
+            <div class="tank-grid" aria-hidden="true"></div>
+            <div id="tankFill" class="tank-fill"></div>
+            <span class="tank-mark" style="--mark: 25%"></span>
+            <span class="tank-mark" style="--mark: 50%"></span>
+            <span class="tank-mark" style="--mark: 75%"></span>
+          </div>
+
+          <div class="tank-readout">
+            <span class="caption">Nivel estimado</span>
+            <strong id="tankLevel">-- %</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 02 · Telemetría -->
+    <section class="facts-section" aria-label="Telemetría del nodo">
+      <div class="section-index">
+        <span class="index-number">02</span>
+        <h2>Telemetría</h2>
+      </div>
+
+      <dl class="facts">
+        <div class="fact">
+          <dt>Nodo</dt>
+          <dd id="nodeId">--</dd>
+          <dd class="note">ESP32</dd>
+        </div>
+
+        <div class="fact">
+          <dt>Secuencia</dt>
+          <dd id="sequence">--</dd>
+          <dd class="note">Último paquete</dd>
+        </div>
+
+        <div class="fact">
+          <dt>Sensor</dt>
+          <dd id="sensorStatus">Esperando</dd>
+          <dd class="note" id="sensorDetail">Sin lecturas</dd>
+        </div>
+
+        <div class="fact">
+          <dt>Turbidez</dt>
+          <dd id="turbidityStatus">--</dd>
+          <dd class="note" id="turbidityDetail">Sin lecturas</dd>
+        </div>
+      </dl>
+    </section>
+
+    <!-- 03 · Calidad -->
+    <section class="quality" aria-labelledby="quality-title">
+      <div class="section-index">
+        <span class="index-number">03</span>
+        <h2 id="quality-title">Calidad del agua</h2>
+      </div>
+
+      <p class="section-note">
+        Clasificación orientativa según la lectura del sensor de turbidez.
+      </p>
 
       <div class="quality-current">
-        <span class="current-label">Diagnóstico actual</span>
+        <span class="caption">Diagnóstico actual</span>
         <strong id="qualityCurrent">Esperando lectura</strong>
         <p id="qualityDetail" class="quality-foot">Sin lecturas disponibles</p>
       </div>
 
       <div class="turbidity-scale" id="turbidityScale">
         <div class="turbidity-segment segment-clear" data-diagnosis="AGUA_CLARA">
-          <span class="segment-bar"></span>
+          <span class="segment-index">N1</span>
+          <span class="segment-bar" aria-hidden="true"></span>
           <span class="segment-name">Agua clara</span>
-          <span class="segment-range">Nivel 1</span>
         </div>
+
         <div class="turbidity-segment segment-low" data-diagnosis="AGUA_POCO_TURBIA">
-          <span class="segment-bar"></span>
+          <span class="segment-index">N2</span>
+          <span class="segment-bar" aria-hidden="true"></span>
           <span class="segment-name">Poco turbia</span>
-          <span class="segment-range">Nivel 2</span>
         </div>
+
         <div class="turbidity-segment segment-medium" data-diagnosis="AGUA_MEDIA_TURBIA">
-          <span class="segment-bar"></span>
+          <span class="segment-index">N3</span>
+          <span class="segment-bar" aria-hidden="true"></span>
           <span class="segment-name">Turbidez media</span>
-          <span class="segment-range">Nivel 3</span>
         </div>
+
         <div class="turbidity-segment segment-high" data-diagnosis="AGUA_TURBIA">
-          <span class="segment-bar"></span>
+          <span class="segment-index">N4</span>
+          <span class="segment-bar" aria-hidden="true"></span>
           <span class="segment-name">Agua turbia</span>
-          <span class="segment-range">Nivel 4</span>
         </div>
       </div>
 
       <p class="quality-foot">
-        La clasificación es orientativa y depende de la calibración
-        del sensor. La turbidez no determina por sí sola si el agua
-        es potable.
+        La turbidez no determina por sí sola si el agua es potable.
+        La clasificación depende de la calibración del sensor.
       </p>
     </section>
 
-    <section class="log">
-      <div class="log-head">
-        <h2>Últimas lecturas</h2>
-        <button id="clearBtn">Limpiar</button>
+    <!-- 04 · Variables -->
+    <section class="panel" aria-labelledby="chart-title">
+      <div class="section-index">
+        <span class="index-number">04</span>
+        <h2 id="chart-title">Variables en tiempo real</h2>
       </div>
+
+      <div class="chart-box">
+        <canvas id="chart"></canvas>
+      </div>
+    </section>
+
+    <!-- 05 · Red -->
+    <section class="panel" aria-labelledby="network-title">
+      <div class="section-index">
+        <span class="index-number">05</span>
+        <h2 id="network-title">Métricas de red</h2>
+      </div>
+
+      <dl class="facts facts--network">
+        <div class="fact">
+          <dt>Latencia (L)</dt>
+          <dd><span id="metricL">--</span> ms</dd>
+        </div>
+
+        <div class="fact">
+          <dt>Latencia promedio</dt>
+          <dd><span id="metricLavg">--</span> ms</dd>
+        </div>
+
+        <div class="fact">
+          <dt>Pérdida (P)</dt>
+          <dd><span id="metricP">--</span> %</dd>
+          <dd class="note" id="metricRx">-- / -- paquetes</dd>
+        </div>
+
+        <div class="fact">
+          <dt>Intervalo ESP32</dt>
+          <dd id="intervalState">--</dd>
+        </div>
+      </dl>
+    </section>
+
+    <!-- 06 · Control -->
+    <section class="panel control" aria-labelledby="control-title">
+      <div class="section-index">
+        <span class="index-number">06</span>
+        <h2 id="control-title">Control del ESP32</h2>
+      </div>
+
+      <p class="control-state">
+        Relé: <strong id="relayState">--</strong>
+      </p>
+
+      <div class="controls">
+        <button data-cmd='{"cmd":"relay","value":1}'>Encender relé</button>
+        <button data-cmd='{"cmd":"relay","value":0}'>Apagar relé</button>
+
+        <span class="controls-divider" aria-hidden="true"></span>
+
+        <button data-cmd='{"cmd":"interval","value":100}' data-interval="100">100 ms</button>
+        <button data-cmd='{"cmd":"interval","value":500}' data-interval="500">500 ms</button>
+        <button data-cmd='{"cmd":"interval","value":1000}' data-interval="1000">1000 ms</button>
+
+        <span class="controls-divider" aria-hidden="true"></span>
+
+        <button data-cmd='{"cmd":"reset_metrics"}'>Reiniciar métricas</button>
+      </div>
+    </section>
+
+    <!-- 07 · Registro -->
+    <section class="log" aria-labelledby="log-title">
+      <div class="log-head">
+        <div class="section-index">
+          <span class="index-number">07</span>
+          <h2 id="log-title">Últimas lecturas</h2>
+        </div>
+
+        <button id="clearBtn">Limpiar registro</button>
+      </div>
+
       <div class="table-wrapper">
         <table>
           <thead>
-            <tr><th>Hora</th><th>Distancia</th><th>Turbidez</th><th>Secuencia</th></tr>
+            <tr>
+              <th scope="col">Hora</th>
+              <th scope="col">Distancia</th>
+              <th scope="col">Turbidez</th>
+              <th scope="col">Secuencia</th>
+            </tr>
           </thead>
           <tbody id="telemetryBody"></tbody>
         </table>
       </div>
     </section>
 
-    <footer>ESP32, MQTT, FastAPI, WebSocket, Dashboard</footer>
+    <footer class="colophon">
+      <span>ESP32</span>
+      <span>MQTT</span>
+      <span>FastAPI</span>
+      <span>WebSocket</span>
+      <span>Dashboard</span>
+    </footer>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

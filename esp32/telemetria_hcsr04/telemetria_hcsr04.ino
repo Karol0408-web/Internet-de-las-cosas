@@ -1,7 +1,10 @@
+#define ARDUINOJSON_USE_LONG_LONG 1
+
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
+#include <sys/time.h>
 
 Preferences prefs;
 
@@ -9,19 +12,21 @@ Preferences prefs;
 const int TRIG_PIN = 5;
 const int ECHO_PIN = 18;
 const int TURBIDITY_PIN = 34;
+const int RELAY_PIN = 2;  // GPIO2 = LED integrado; cambialo al pin de tu rele
 
 // ---------- Configuracion ----------
-const char* WIFI_SSID = "uto";
-const char* WIFI_PASSWORD = "1234567890";
-const char* MQTT_BROKER = "192.168.137.59";
+const char* WIFI_SSID = "Megacable_2.4G_FD80";
+const char* WIFI_PASSWORD = "xbkpGdEX";
+const char* MQTT_BROKER = "192.168.1.7";
 const int MQTT_PORT = 1883;
 const char* MQTT_TOPIC = "iot/tanque/telemetria";
+const char* CONTROL_TOPIC = "iot/tanque/control";
 
 const float FACTOR_DIVISOR = 1.0;
 const int TURBIDITY_SAMPLES = 15;
 
 const unsigned long SAMPLE_INTERVAL = 100;
-const unsigned long PUBLISH_INTERVAL = 1000;
+unsigned long publishInterval = 1000;  // se cambia desde el dashboard
 const int WINDOW_SIZE = 10;
 
 WiFiClient espClient;
@@ -47,9 +52,46 @@ unsigned long lastSample = 0;
 unsigned long lastPublish = 0;
 unsigned long sequenceId = 0;
 
+bool relayState = false;
+
 // ---------- Calibracion ----------
 int voltageClear = -1;
 int voltageTurbid = -1;
+
+// ---------- Hora (NTP) ----------
+void syncTime() {
+  configTime(0, 0, "pool.ntp.org", "time.google.com");
+
+  unsigned long t0 = millis();
+  while (time(nullptr) < 1700000000 && millis() - t0 < 15000) {
+    delay(200);
+  }
+
+  Serial.println(time(nullptr) > 1700000000 ? "Hora sincronizada" : "Sin NTP: latencia no disponible");
+}
+
+uint64_t epochMs() {
+  struct timeval tv;
+  gettimeofday(&tv, nullptr);
+  return (uint64_t)tv.tv_sec * 1000ULL + tv.tv_usec / 1000;
+}
+
+// ---------- Comandos Web -> ESP32 ----------
+void onCommand(char* topic, byte* payload, unsigned int length) {
+  StaticJsonDocument<128> cmd;
+  if (deserializeJson(cmd, payload, length)) return;
+
+  const char* name = cmd["cmd"] | "";
+
+  if (!strcmp(name, "relay")) {
+    relayState = (cmd["value"] | 0) != 0;
+    digitalWrite(RELAY_PIN, relayState ? HIGH : LOW);
+  } else if (!strcmp(name, "interval")) {
+    publishInterval = constrain((int)(cmd["value"] | 1000), 50, 5000);
+  }
+
+  Serial.printf("Comando: %s\n", name);
+}
 
 // ---------- WiFi ----------
 void connectWiFi() {
@@ -76,6 +118,7 @@ void connectMQTT() {
 
     if (mqtt.connect(id.c_str())) {
       Serial.println("Conectado");
+      mqtt.subscribe(CONTROL_TOPIC);
     } else {
       Serial.print("Error: ");
       Serial.println(mqtt.state());
@@ -205,6 +248,40 @@ void processSerialCalibration() {
   Serial.println(getTurbidityStatus());
 }
 
+// ---------- Publicacion ----------
+void publishTelemetry(unsigned long now) {
+  StaticJsonDocument<512> doc;
+
+  doc["node_id"] = "ESP32_TANQUE_01";
+  doc["sequence_id"] = sequenceId++;
+  doc["timestamp_ms"] = epochMs();
+
+  JsonObject data = doc.createNestedObject("data");
+
+  if (distanceCount > 0) data["distance_cm"] = round(distanceFiltered * 100) / 100.0;
+  else data["distance_cm"] = nullptr;
+
+  if (voltageValid && voltageFiltered >= 0) data["turbidity_voltage_mv"] = voltageFiltered;
+  else data["turbidity_voltage_mv"] = nullptr;
+
+  if (voltageClear >= 0 && voltageTurbid >= 0 && voltageValid) data["turbidity_pct"] = turbidityPercent();
+  else data["turbidity_pct"] = nullptr;
+
+  doc["diagnostico_turbidez"] = getTurbidityStatus();
+  doc["relay"] = relayState;
+  doc["interval_ms"] = publishInterval;
+
+  char payload[512];
+  size_t len = serializeJson(doc, payload, sizeof(payload));
+
+  if (len > 0 && mqtt.publish(MQTT_TOPIC, payload)) {
+    Serial.print("JSON MQTT: ");
+    Serial.println(payload);
+  } else {
+    Serial.println("Error publicando MQTT");
+  }
+}
+
 // ---------- Setup ----------
 void setup() {
   Serial.begin(115200);
@@ -215,29 +292,29 @@ void setup() {
 
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, LOW);
 
   analogReadResolution(12);
   analogSetPinAttenuation(TURBIDITY_PIN, ADC_11db);
 
   mqtt.setServer(MQTT_BROKER, MQTT_PORT);
+  mqtt.setBufferSize(512);
+  mqtt.setCallback(onCommand);
 
   Serial.println("Monitor de tanque");
   Serial.println("Escribe L con agua clara.");
   Serial.println("Escribe T con agua turbia.");
 
   connectWiFi();
+  syncTime();
   connectMQTT();
 }
 
 // ---------- Loop ----------
 void loop() {
-  if (WiFi.status() != WL_CONNECTED) {
-    connectWiFi();
-  }
-
-  if (!mqtt.connected()) {
-    connectMQTT();
-  }
+  if (WiFi.status() != WL_CONNECTED) connectWiFi();
+  if (!mqtt.connected()) connectMQTT();
 
   mqtt.loop();
   processSerialCalibration();
@@ -251,53 +328,8 @@ void loop() {
     readTurbidity();
   }
 
-  if (now - lastPublish >= PUBLISH_INTERVAL) {
+  if (now - lastPublish >= publishInterval) {
     lastPublish = now;
-
-    StaticJsonDocument<512> doc;
-
-    doc["node_id"] = "ESP32_TANQUE_01";
-    doc["sequence_id"] = sequenceId++;
-    doc["timestamp_ms"] = now;
-    doc["heap_free"] = ESP.getFreeHeap();
-
-    if (distanceCount > 0) {
-      doc["distance_cm"] = round(distanceFiltered * 100) / 100.0;
-    } else {
-      doc["distance_cm"] = nullptr;
-    }
-
-    doc["turbidity_valid"] = voltageValid;
-
-    if (voltageValid && voltageFiltered >= 0) {
-      doc["turbidity_voltage_mv"] = voltageFiltered;
-    } else {
-      doc["turbidity_voltage_mv"] = nullptr;
-    }
-
-    doc["diagnostico_turbidez"] = getTurbidityStatus();
-    if (voltageClear >= 0 && voltageTurbid >= 0 && voltageValid) {
-      doc["turbidity_pct"] = turbidityPercent();
-    } else {
-      doc["turbidity_pct"] = nullptr;
-    }
-
-    char payload[512];
-    size_t len = serializeJson(doc, payload, sizeof(payload));
-
-    Serial.println("-------------------------");
-    Serial.print("Distancia filtrada: ");
-    Serial.println(distanceFiltered);
-    Serial.print("Voltaje (mV): ");
-    Serial.println(voltageFiltered);
-    Serial.print("Diagnostico: ");
-    Serial.println(getTurbidityStatus());
-
-    if (len > 0 && mqtt.publish(MQTT_TOPIC, payload)) {
-      Serial.print("JSON MQTT: ");
-      Serial.println(payload);
-    } else {
-      Serial.println("Error publicando MQTT");
-    }
+    publishTelemetry(now);
   }
 }
