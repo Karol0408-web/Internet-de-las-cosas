@@ -95,7 +95,7 @@ async def procesar(p: dict, t_rx: float):
             s.add(Telemetria(
                 node_id=p.get("node_id", "--"),
                 sequence_id=int(p["sequence_id"]),
-                variables_json=p.get("data", {}),
+                variables_json={**p.get("data", {}), "interval_ms": p.get("interval_ms")},
                 diagnostico=p.get("diagnostico_turbidez"),
                 latencia_ms=lat,
             ))

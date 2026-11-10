@@ -1,6 +1,16 @@
 
 "use strict";
 
+console.log("[DEBUG] app.js se ejecutó:", new Date().toLocaleTimeString());
+
+window.addEventListener("beforeunload", () => {
+    console.warn("[DEBUG] La página está a punto de recargarse o cerrarse");
+});
+
+window.addEventListener("pagehide", () => {
+    console.warn("[DEBUG] Se disparó pagehide");
+});
+
 // ---------- Configuración WebSocket ----------
 const WS_URL = `ws://${window.location.hostname}:8000/ws/telemetria`;
 
