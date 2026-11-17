@@ -7,6 +7,7 @@ import paho.mqtt.client as mqtt
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
+from ml_service import clasificar
 
 from db import Base, Session, Telemetria, engine
 
@@ -20,7 +21,7 @@ clients: set[WebSocket] = set()
 mqtt_connected = False
 mqtt_client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
 main_loop: asyncio.AbstractEventLoop | None = None
-
+ultimo_rx: float | None = None
 metrics = {"n": 0, "seq_min": None, "seq_max": None, "lat_sum": 0.0, "lat_n": 0}
 
 
@@ -85,23 +86,31 @@ async def manejar_comando(raw: str):
 
 # ---------- Procesamiento ----------
 async def procesar(p: dict, t_rx: float):
+    global ultimo_rx
+
     try:
         ts = p.get("timestamp_ms")
         # Solo hay latencia valida si el ESP32 envio hora epoch (NTP)
         lat = round(t_rx - ts, 1) if isinstance(ts, (int, float)) and ts > 1e12 else None
         m = actualizar_metricas(int(p["sequence_id"]), lat)
 
+        delta = round(t_rx - ultimo_rx, 1) if ultimo_rx else None
+        ultimo_rx = t_rx
+        d = p.get("data", {})
+        clase = clasificar(d.get("turbidity_voltage_mv"), d.get("distance_cm"), lat, delta)
+
         async with Session() as s:
             s.add(Telemetria(
                 node_id=p.get("node_id", "--"),
                 sequence_id=int(p["sequence_id"]),
-                variables_json={**p.get("data", {}), "interval_ms": p.get("interval_ms")},
+                variables_json={**d, "interval_ms": p.get("interval_ms")},
                 diagnostico=p.get("diagnostico_turbidez"),
+                clase_predicha_rf=clase,
                 latencia_ms=lat,
             ))
             await s.commit()
 
-        await broadcast({**p, "latencia_ms": lat, "metricas": m})
+        await broadcast({**p, "latencia_ms": lat, "metricas": m, "clase_rf": clase})
     except Exception as exc:
         print("[PROC] Error:", exc)
 

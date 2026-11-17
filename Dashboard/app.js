@@ -366,6 +366,11 @@ function handleData(raw) {
     console.log("[WS]", raw.message);
     return;
   }
+  const rf = $("rfBadge");
+  if (rf && raw.clase_rf) {
+  rf.textContent = raw.clase_rf;
+  rf.style.background = { Normal: "#27866d", Advertencia: "#c58a2d", "Crítico": "#c75449" }[raw.clase_rf];
+  }
 
   // Combina los datos principales con el objeto data, si existe.
   const data = {

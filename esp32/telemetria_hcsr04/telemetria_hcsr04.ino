@@ -15,9 +15,9 @@ const int TURBIDITY_PIN = 34;
 const int RELAY_PIN = 2;  // GPIO2 = LED integrado; cambialo al pin de tu rele
 
 // ---------- Configuracion ----------
-const char* WIFI_SSID = "Megacable_2.4G_FD80";
-const char* WIFI_PASSWORD = "xbkpGdEX";
-const char* MQTT_BROKER = "192.168.1.7";
+const char* WIFI_SSID = "Compu8";
+const char* WIFI_PASSWORD = "123456789";
+const char* MQTT_BROKER = "192.168.137.178";
 const int MQTT_PORT = 1883;
 const char* MQTT_TOPIC = "iot/tanque/telemetria";
 const char* CONTROL_TOPIC = "iot/tanque/control";
